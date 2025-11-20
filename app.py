@@ -50,7 +50,7 @@ def weather():
         "humidity": data["main"]["humidity"],
         "wind": data["wind"]["speed"],
         "description": data["weather"][0]["description"],
-        "icon": f"https://openweathermap.org/img/wn/{icon_code}@2x.png"
+        "icon": icon_code   # <-- CORREÇÃO AQUI
     }
 
     return jsonify(result)
