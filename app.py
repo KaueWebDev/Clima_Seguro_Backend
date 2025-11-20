@@ -49,11 +49,12 @@ def weather():
         "humidity": data["main"]["humidity"],
         "wind": data["wind"]["speed"],
         "description": data["weather"][0]["description"],
-        "icon": f"https://openweathermap.org/img/wn/%7Bdata['weather'][0]['icon']%7D@2x.png"
+        "icon": f"https://openweathermap.org/img/wn/{data['weather'][0]['icon']}@2x.png"
     }
 
     return jsonify(result)
 
-if name == "main":
+if __name__ == "__main__":
 
     app.run(debug=True)
+
