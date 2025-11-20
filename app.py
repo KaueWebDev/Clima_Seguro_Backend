@@ -40,21 +40,20 @@ def weather():
 
     country_code = data["sys"]["country"]
     flag = get_flag_url(country_code)
-
     icon_code = data["weather"][0]["icon"]
 
-result = {
-    "city": data["name"],
-    "country": country_code,
-    "flag": flag,
-    "temp": data["main"]["temp"],
-    "humidity": data["main"]["humidity"],
-    "wind": data["wind"]["speed"],
-    "description": data["weather"][0]["description"],
-    "icon": f"https://openweathermap.org/img/wn/{icon_code}@2x.png"
-}
+    result = {
+        "city": data["name"],
+        "country": country_code,
+        "flag": flag,
+        "temp": data["main"]["temp"],
+        "humidity": data["main"]["humidity"],
+        "wind": data["wind"]["speed"],
+        "description": data["weather"][0]["description"],
+        "icon": f"https://openweathermap.org/img/wn/{icon_code}@2x.png"
+    }
+
     return jsonify(result)
 
 if __name__ == "__main__":
-
     app.run(debug=True)
