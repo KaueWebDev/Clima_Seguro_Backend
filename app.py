@@ -1,9 +1,11 @@
 from flask import Flask, request, jsonify
+from flask_cors import CORS
 from utils.weather import get_weather
 from utils.geocode import search_city
 from utils.flags import get_flag_url
 
 app = Flask(__name__)
+CORS(app)  # Libera o frontend para acessar
 
 @app.route("/")
 def home():
@@ -50,7 +52,7 @@ def weather():
         "humidity": data["main"]["humidity"],
         "wind": data["wind"]["speed"],
         "description": data["weather"][0]["description"],
-        "icon": icon_code   # <-- CORREÇÃO AQUI
+        "icon": icon_code
     }
 
     return jsonify(result)
