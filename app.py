@@ -3,7 +3,7 @@ from utils.weather import get_weather
 from utils.geocode import search_city
 from utils.flags import get_flag_url
 
-app = Flask(name)
+app = Flask(__name__)
 
 @app.route("/")
 def home():
@@ -55,4 +55,5 @@ def weather():
     return jsonify(result)
 
 if name == "main":
+
     app.run(debug=True)
