@@ -1,17 +1,6 @@
 import requests
 
 def search_city(query):
-    url = "https://nominatim.openstreetmap.org/search"
-    params = {
-        "q": query,
-        "format": "json",
-        "limit": 5
-    }
-
-    headers = {
-        "User-Agent": "weather-app-render/1.0 (contact: example@example.com)"
-    }
-
-    response = requests.get(url, params=params, headers=headers)
-
+    url = f"https://nominatim.openstreetmap.org/search?q={query}&format=json&limit=5&addressdetails=1"
+    response = requests.get(url, headers={"User-Agent": "ClimaSeguro-App"})
     return response.json()
