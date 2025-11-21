@@ -1,1 +1,0 @@
-OPENWEATHER_API_KEY = "2adebdb753e2da1f4679b9bd9f5dd578"
