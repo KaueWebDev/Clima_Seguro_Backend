@@ -1,24 +1,22 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
-
-from utils.weather import get_weather
 from utils.geocode import search_city
+from utils.weather import get_weather
 from utils.flags import get_flag_url
 from utils.structures import LinkedList, Queue, Stack, HashTable
 
 app = Flask(__name__)
 CORS(app)
 
-# ----------------- ESTRUTURAS DE DADOS -----------------
-pesquisas_fila = Queue()           # últimas pesquisas
-historico_pilha = Stack()          # histórico completo
-previsoes_lista = LinkedList()     # previsões salvas
-cache_tempo = HashTable()          # cache de tempo
+fila = Queue()
+pilha = Stack()
+lista = LinkedList()
+cache = HashTable()
 
 
 @app.route("/")
 def home():
-    return "API de Previsão do Tempo Online!"
+    return "API ON — Open-Meteo + Estruturas"
 
 
 @app.route("/api/autocomplete")
@@ -32,10 +30,10 @@ def autocomplete():
 
     for c in cities:
         results.append({
-            "name": c.get("display_name"),
-            "lat": c.get("lat"),
-            "lon": c.get("lon"),
-            "country_code": c.get("address", {}).get("country_code", "").upper()
+            "name": c["display_name"],
+            "lat": c["lat"],
+            "lon": c["lon"],
+            "country": c["address"].get("country_code", "").upper()
         })
 
     return jsonify(results)
@@ -45,79 +43,51 @@ def autocomplete():
 def weather():
     lat = request.args.get("lat")
     lon = request.args.get("lon")
-    city_override = request.args.get("city")            # opcional
-    country_code_override = request.args.get("country_code")  # opcional (BR, US, etc)
+    name = request.args.get("name", "Local Desconhecido")
+    country = request.args.get("country", "")
 
-    if not lat or not lon:
-        return jsonify({"error": "Coordenadas inválidas"}), 400
+    key = f"{lat},{lon}"
 
-    chave = f"{lat},{lon}"
+    cached = cache.get(key)
+    if cached:
+        return jsonify(cached)
 
-    # ---------------- CACHE (TABELA HASH) ----------------
-    dados_cache = cache_tempo.get(chave)
-    if dados_cache:
-        print("✔ Usando cache")
-        # se houver override de cidade/país, atualiza antes de retornar
-        if city_override:
-            dados_cache["city"] = city_override
-        if country_code_override:
-            dados_cache["country"] = country_code_override
-            dados_cache["flag"] = get_flag_url(country_code_override)
-        return jsonify(dados_cache)
-
-    # ---------------- CONSULTA OPEN-METEO --------------------
-    data = get_weather(lat, lon)
-
-    # Se frontend enviou nome/país, priorizamos
-    city_name = city_override or data.get("name") or f"{lat},{lon}"
-    country_code = country_code_override or (data.get("sys", {}).get("country") or "")
-
-    flag = get_flag_url(country_code) if country_code else None
-    icon_code = data["weather"][0].get("icon")
+    w = get_weather(lat, lon)
 
     result = {
-        "city": city_name,
-        "country": country_code,
-        "flag": flag,
-        "temp": data["main"]["temp"],
-        "humidity": data["main"]["humidity"],
-        "wind": data["wind"]["speed"],
-        "description": data["weather"][0]["description"],
-        "icon": icon_code
+        "city": name,
+        "country": country,
+        "flag": get_flag_url(country),
+        "temp": w["temperature"],
+        "humidity": w["humidity"],
+        "wind": w["wind"],
+        "description": "Condição atual"
     }
 
-    # Salvar no cache
-    cache_tempo.set(chave, result)
-
-    # ---------------- FILA (últimas pesquisas) ----------------
-    pesquisas_fila.enqueue(result["city"])
-
-    # ---------------- PILHA (histórico) ----------------
-    historico_pilha.push(result["city"])
-
-    # ---------------- LISTA LIGADA (previsões) ----------------
-    previsoes_lista.add(result)
+    cache.set(key, result)
+    fila.enqueue(name)
+    pilha.push(name)
+    lista.add(result)
 
     return jsonify(result)
-    
-# ---------- ROTAS PARA VER AS ESTRUTURAS (opcional) ----------
-@app.route("/api/debug/queue")
-def fila_view():
-    return jsonify(pesquisas_fila.get_all())
 
-@app.route("/api/debug/stack")
-def pilha_view():
-    return jsonify(historico_pilha.get_all())
 
-@app.route("/api/debug/list")
-def lista_view():
-    return jsonify(previsoes_lista.to_list())
+@app.route("/debug/queue")
+def ver_fila():
+    return jsonify(fila.get_all())
 
-@app.route("/api/debug/cache")
-def cache_view():
-    return jsonify(cache_tempo.table)
+@app.route("/debug/stack")
+def ver_pilha():
+    return jsonify(pilha.get_all())
+
+@app.route("/debug/list")
+def ver_lista():
+    return jsonify(lista.to_list())
+
+@app.route("/debug/cache")
+def ver_cache():
+    return jsonify(cache.data)
 
 
 if __name__ == "__main__":
     app.run(debug=True)
-
