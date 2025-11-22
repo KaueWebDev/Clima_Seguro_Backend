@@ -1,77 +1,65 @@
-# utils/structures.py
-
-# ---------------- LISTA LIGADA ----------------
+# Lista ligada
 class Node:
-    def __init__(self, value):
-        self.value = value
+    def __init__(self, data):
+        self.data = data
         self.next = None
 
 class LinkedList:
     def __init__(self):
         self.head = None
-        self.size = 0
 
-    def add(self, value):
-        new = Node(value)
-        if not self.head:
-            self.head = new
-        else:
-            current = self.head
-            while current.next:
-                current = current.next
-            current.next = new
-        self.size += 1
+    def add(self, data):
+        node = Node(data)
+        node.next = self.head
+        self.head = node
 
     def to_list(self):
-        arr = []
+        result = []
         current = self.head
         while current:
-            arr.append(current.value)
+            result.append(current.data)
             current = current.next
-        return arr
+        return result
 
-# ---------------- FILA ----------------
+# Fila
 class Queue:
-    def __init__(self, limit=10):
+    def __init__(self):
         self.items = []
-        self.limit = limit
 
-    def enqueue(self, value):
-        self.items.append(value)
-        if len(self.items) > self.limit:
-            self.items.pop(0)
+    def enqueue(self, item):
+        self.items.append(item)
+
+    def dequeue(self):
+        if self.items:
+            return self.items.pop(0)
+        return None
 
     def get_all(self):
-        return list(self.items)
+        return self.items
 
-# ---------------- PILHA ----------------
+# Pilha
 class Stack:
     def __init__(self):
         self.items = []
 
-    def push(self, value):
-        self.items.append(value)
+    def push(self, item):
+        self.items.append(item)
 
     def pop(self):
-        if not self.items:
-            return None
-        return self.items.pop()
+        if self.items:
+            return self.items.pop()
+        return None
 
     def get_all(self):
-        return list(self.items)
+        return self.items
 
-# ---------------- TABELA HASH ----------------
+# Tabela Hash simples
 class HashTable:
     def __init__(self):
-        # usamos um dict interno; expomos como `.data`
         self.data = {}
-
-    def get(self, key):
-        return self.data.get(key)
 
     def set(self, key, value):
         self.data[key] = value
 
-    def delete(self, key):
-        if key in self.data:
-            del self.data[key]
+    def get(self, key):
+        return self.data.get(key, None)
