@@ -49,15 +49,19 @@ def weather():
     name = request.args.get("name", "Local Desconhecido")
     country = request.args.get("country", "")
 
+    if not lat or not lon:
+        return jsonify({"error": "Coordenadas inválidas"}), 400
+
     key = f"{lat},{lon}"
 
+    # Verifica cache
     cached = cache.get(key)
     if cached:
         return jsonify(cached)
 
     try:
         w = get_weather(lat, lon)
-    except Exception as e:
+    except Exception:
         return jsonify({"error": "Falha ao obter dados do clima"}), 500
 
     result = {
@@ -67,7 +71,7 @@ def weather():
         "temp": w["temperature"],
         "humidity": w["humidity"],
         "wind": w["wind"],
-        "description": "Condição atual"
+        "description": w["description"]
     }
 
     # Atualiza estruturas de dados
