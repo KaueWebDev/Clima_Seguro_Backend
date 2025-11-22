@@ -45,6 +45,8 @@ def autocomplete():
 def weather():
     lat = request.args.get("lat")
     lon = request.args.get("lon")
+    city_override = request.args.get("city")            # opcional
+    country_code_override = request.args.get("country_code")  # opcional (BR, US, etc)
 
     if not lat or not lon:
         return jsonify({"error": "Coordenadas inválidas"}), 400
@@ -55,17 +57,26 @@ def weather():
     dados_cache = cache_tempo.get(chave)
     if dados_cache:
         print("✔ Usando cache")
+        # se houver override de cidade/país, atualiza antes de retornar
+        if city_override:
+            dados_cache["city"] = city_override
+        if country_code_override:
+            dados_cache["country"] = country_code_override
+            dados_cache["flag"] = get_flag_url(country_code_override)
         return jsonify(dados_cache)
 
-    # ---------------- CONSULTA NORMAL --------------------
+    # ---------------- CONSULTA OPEN-METEO --------------------
     data = get_weather(lat, lon)
 
-    country_code = data["sys"]["country"]
-    flag = get_flag_url(country_code)
-    icon_code = data["weather"][0]["icon"]
+    # Se frontend enviou nome/país, priorizamos
+    city_name = city_override or data.get("name") or f"{lat},{lon}"
+    country_code = country_code_override or (data.get("sys", {}).get("country") or "")
+
+    flag = get_flag_url(country_code) if country_code else None
+    icon_code = data["weather"][0].get("icon")
 
     result = {
-        "city": data["name"],
+        "city": city_name,
         "country": country_code,
         "flag": flag,
         "temp": data["main"]["temp"],
@@ -88,8 +99,7 @@ def weather():
     previsoes_lista.add(result)
 
     return jsonify(result)
-
-
+    
 # ---------- ROTAS PARA VER AS ESTRUTURAS (opcional) ----------
 @app.route("/api/debug/queue")
 def fila_view():
@@ -110,3 +120,4 @@ def cache_view():
 
 if __name__ == "__main__":
     app.run(debug=True)
+
