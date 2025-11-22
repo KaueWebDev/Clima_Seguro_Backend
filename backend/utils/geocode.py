@@ -1,4 +1,3 @@
-
 import requests
 
 def search_city(query, limit=5):
