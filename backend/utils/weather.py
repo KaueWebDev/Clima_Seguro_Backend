@@ -52,6 +52,7 @@ def get_weather(lat, lon):
     humidity_list = data.get("hourly", {}).get("relative_humidity_2m", [])
     humidity = humidity_list[0] if humidity_list else 0
 
+    # Converte weathercode em descrição
     weather_code = current.get("weathercode", 0)
     description = weather_map.get(weather_code, "Condição atual")
 
