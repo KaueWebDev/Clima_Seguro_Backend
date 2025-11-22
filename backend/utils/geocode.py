@@ -1,16 +1,17 @@
 
 import requests
 
-def search_city(query, limit=6):
-    url = "https://geocoding-api.open-meteo.com/v1/search"
+def search_city(query, limit=5):
+    url = "https://nominatim.openstreetmap.org/search"
     params = {
-        "name": query,
-        "count": limit,
-        "language": "pt",
-        "format": "json"
+        "q": query,
+        "format": "json",
+        "addressdetails": 1,
+        "limit": limit
     }
-    r = requests.get(url, params=params, timeout=10)
-    r.raise_for_status()
-    data = r.json()
-    # open-meteo returns 'results' list
-    return data.get("results", [])
+    headers = {
+        "User-Agent": "ClimaSeguro/1.0 (contact@example.com)"
+    }
+    res = requests.get(url, params=params, headers=headers, timeout=10)
+    res.raise_for_status()
+    return res.json()
