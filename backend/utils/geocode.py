@@ -1,16 +1,12 @@
 import requests
 
-def search_city(query, limit=5):
+def search_city(query):
     url = "https://nominatim.openstreetmap.org/search"
     params = {
         "q": query,
         "format": "json",
         "addressdetails": 1,
-        "limit": limit
+        "limit": 5
     }
-    headers = {
-        "User-Agent": "ClimaSeguro/1.0 (contact@example.com)"
-    }
-    res = requests.get(url, params=params, headers=headers, timeout=10)
-    res.raise_for_status()
+    res = requests.get(url, params=params)
     return res.json()
