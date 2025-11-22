@@ -1,3 +1,5 @@
+# utils/structures.py
+
 # ---------------- LISTA LIGADA ----------------
 class Node:
     def __init__(self, value):
@@ -14,20 +16,19 @@ class LinkedList:
         if not self.head:
             self.head = new
         else:
-            cur = self.head
-            while cur.next:
-                cur = cur.next
-            cur.next = new
+            current = self.head
+            while current.next:
+                current = current.next
+            current.next = new
         self.size += 1
 
     def to_list(self):
-        out = []
-        cur = self.head
-        while cur:
-            out.append(cur.value)
-            cur = cur.next
-        return out
-
+        arr = []
+        current = self.head
+        while current:
+            arr.append(current.value)
+            current = current.next
+        return arr
 
 # ---------------- FILA ----------------
 class Queue:
@@ -40,14 +41,8 @@ class Queue:
         if len(self.items) > self.limit:
             self.items.pop(0)
 
-    def dequeue(self):
-        if not self.items:
-            return None
-        return self.items.pop(0)
-
     def get_all(self):
         return list(self.items)
-
 
 # ---------------- PILHA ----------------
 class Stack:
@@ -62,27 +57,21 @@ class Stack:
             return None
         return self.items.pop()
 
-    def peek(self):
-        return self.items[-1] if self.items else None
-
     def get_all(self):
         return list(self.items)
 
-
-# ---------------- TABELA HASH (simples) ----------------
+# ---------------- TABELA HASH ----------------
 class HashTable:
     def __init__(self):
-        self.table = {}
+        # usamos um dict interno; expomos como `.data`
+        self.data = {}
 
     def get(self, key):
-        return self.table.get(key)
+        return self.data.get(key)
 
     def set(self, key, value):
-        self.table[key] = value
+        self.data[key] = value
 
     def delete(self, key):
-        if key in self.table:
-            del self.table[key]
-
-    def to_dict(self):
-        return dict(self.table)
+        if key in self.data:
+            del self.data[key]
