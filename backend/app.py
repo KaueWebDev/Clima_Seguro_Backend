@@ -1,6 +1,6 @@
-# app.py
 from flask import Flask, request, jsonify
 from flask_cors import CORS
+
 from utils.geocode import search_city
 from utils.weather import get_weather
 from utils.flags import get_flag_url
@@ -14,9 +14,11 @@ pilha = Stack()
 lista = LinkedList()
 cache = HashTable()
 
+
 @app.route("/")
 def home():
     return "API ON — Open-Meteo + Estruturas"
+
 
 @app.route("/api/autocomplete")
 def autocomplete():
@@ -24,60 +26,70 @@ def autocomplete():
     if len(query) < 2:
         return jsonify([])
 
-    cities = search_city(query)
+    try:
+        cities = search_city(query)
+    except Exception as e:
+        return jsonify([]), 500
+
     results = []
     for c in cities:
         results.append({
-            "name": c.get("name") or c.get("display_name") or c.get("address", {}).get("city") or c.get("country"),
-            "lat": c.get("latitude"),
-            "lon": c.get("longitude"),
-            "country": c.get("country_code", "").upper(),
-            "display_name": c.get("name") or c.get("display_name")
+            "name": c.get("display_name"),
+            "lat": c.get("lat"),
+            "lon": c.get("lon"),
+            "country": c.get("address", {}).get("country_code", "").upper()
         })
+
     return jsonify(results)
+
 
 @app.route("/api/weather")
 def weather():
     lat = request.args.get("lat")
     lon = request.args.get("lon")
-    name = request.args.get("name") or request.args.get("city") or "Local Desconhecido"
+    name = request.args.get("name", None)
     country = request.args.get("country", "")
 
     if not lat or not lon:
         return jsonify({"error": "Coordenadas inválidas"}), 400
 
     key = f"{lat},{lon}"
+
+    # cache
     cached = cache.get(key)
     if cached:
-        # acrescenta às estruturas mas não faz nova consulta
-        fila.enqueue(name)
-        pilha.push(name)
-        lista.add(cached)
+        # se o frontend quiser mostrar o nome enviado, priorizamos name se fornecido
+        if name:
+            cached = dict(cached)  # shallow copy
+            cached["city"] = name
+            cached["country"] = country
+            cached["flag"] = get_flag_url(country)
         return jsonify(cached)
 
-    # Chamada ao Open-Meteo (garantir windspeed em km/h)
-    # get_weather implementa a requisição; se quiser forçar km/h adicione windspeed_unit param lá
-    w = get_weather(lat, lon)
+    try:
+        w = get_weather(lat, lon)
+    except Exception as e:
+        return jsonify({"error": "Erro ao buscar tempo"}), 500
 
     result = {
-        "city": name,
+        "city": name or "Local Desconhecido",
         "country": country,
         "flag": get_flag_url(country),
         "temp": w.get("temperature"),
         "humidity": w.get("humidity"),
         "wind": w.get("wind"),
-        "description": "Condição atual",
-        "time": w.get("time")
+        "description": "Condição atual"
     }
 
     cache.set(key, result)
-    fila.enqueue(name)
-    pilha.push(name)
+    fila.enqueue(result["city"])
+    pilha.push(result["city"])
     lista.add(result)
 
     return jsonify(result)
 
-# Rotas de debug para ver estruturas
+
+# Debug routes
 @app.route("/debug/queue")
 def ver_fila():
     return jsonify(fila.get_all())
@@ -92,7 +104,8 @@ def ver_lista():
 
 @app.route("/debug/cache")
 def ver_cache():
-    return jsonify(cache.to_dict())
+    return jsonify(cache.data)
+
 
 if __name__ == "__main__":
-    app.run(debug=True, host="0.0.0.0", port=5000)
+    app.run(debug=True, host="0.0.0.0")
