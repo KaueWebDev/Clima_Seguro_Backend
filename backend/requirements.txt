@@ -1,4 +1,4 @@
-fastapi
-uvicorn
+Flask>=2.0
+flask-cors
 requests
-pytz
+gunicorn
