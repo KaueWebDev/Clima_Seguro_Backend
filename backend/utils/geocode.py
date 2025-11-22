@@ -9,8 +9,9 @@ def search_city(query):
             "addressdetails": 1,
             "limit": 5
         }
-        res = requests.get(url, params=params, timeout=5)
-        res.raise_for_status()  # dispara exceção se HTTP != 200
+        headers = {"User-Agent": "ClimaSeguroApp/1.0 (meuemail@dominio.com)"}
+        res = requests.get(url, params=params, headers=headers, timeout=5)
+        res.raise_for_status()
         return res.json()
     except Exception as e:
         print("Erro search_city:", e)
