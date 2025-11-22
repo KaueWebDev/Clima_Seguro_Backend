@@ -1,6 +1,3 @@
-# utils/structures.py
-
-# ---------------- LISTA LIGADA ----------------
 class Node:
     def __init__(self, value):
         self.value = value
@@ -16,18 +13,18 @@ class LinkedList:
         if not self.head:
             self.head = new
         else:
-            current = self.head
-            while current.next:
-                current = current.next
-            current.next = new
+            cur = self.head
+            while cur.next:
+                cur = cur.next
+            cur.next = new
         self.size += 1
 
     def to_list(self):
         arr = []
-        current = self.head
-        while current:
-            arr.append(current.value)
-            current = current.next
+        cur = self.head
+        while cur:
+            arr.append(cur.value)
+            cur = cur.next
         return arr
 
 
@@ -35,12 +32,12 @@ class LinkedList:
 class Queue:
     def __init__(self):
         self.items = []
-    
+
     def enqueue(self, value):
         self.items.append(value)
-        if len(self.items) > 10:  # limite de 10 pesquisas
+        if len(self.items) > 10:
             self.items.pop(0)
-    
+
     def get_all(self):
         return self.items
 
@@ -49,14 +46,9 @@ class Queue:
 class Stack:
     def __init__(self):
         self.items = []
-    
+
     def push(self, value):
         self.items.append(value)
-
-    def pop(self):
-        if not self.items:
-            return None
-        return self.items.pop()
 
     def get_all(self):
         return self.items
@@ -65,10 +57,10 @@ class Stack:
 # ---------------- TABELA HASH ----------------
 class HashTable:
     def __init__(self):
-        self.table = {}
+        self.data = {}
 
     def get(self, key):
-        return self.table.get(key)
+        return self.data.get(key)
 
     def set(self, key, value):
-        self.table[key] = value
+        self.data[key] = value
