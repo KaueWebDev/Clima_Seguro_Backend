@@ -15,7 +15,6 @@ pilha = Stack()
 lista = LinkedList()
 cache = HashTable()
 
-
 # Mapeamento estado completo -> sigla (PT-BR)
 _STATES_PT_BR = {
     "acre": "AC", "alagoas": "AL", "amapá": "AP", "amapa": "AP", "amazonas": "AM",
@@ -32,14 +31,12 @@ _STATES_PT_BR = {
 
 def extract_city_state_country_from_address(addr):
     """
-    Recebe o objeto 'address' do Nominatim (search_city) e tenta extrair
-    cidade, sigla do estado (UF) e country_code (BR, PT, US, etc).
-    Retorna (city, uf_or_empty, country_code_or_empty).
+    Recebe o objeto 'address' do Nominatim e extrai city, uf, country_code.
+    Retorna (city, uf, country_code).
     """
     if not isinstance(addr, dict):
         return ("Desconhecido", "", "")
 
-    # Cidade pode aparecer em vários campos
     city = (addr.get("city")
             or addr.get("town")
             or addr.get("village")
@@ -47,16 +44,13 @@ def extract_city_state_country_from_address(addr):
             or addr.get("county")
             or addr.get("hamlet")
             or addr.get("locality")
-            or addr.get("village")
             or "").strip()
 
-    # Estado pode vir como 'state' (nome completo)
     state_full = (addr.get("state") or "").strip()
     uf = ""
     if state_full:
         uf = _STATES_PT_BR.get(state_full.lower(), "")
 
-    # country_code (ex: 'br', 'pt', 'us')
     country_code = (addr.get("country_code") or "").strip().upper()
 
     return (city if city else "Desconhecido", uf, country_code)
@@ -64,10 +58,10 @@ def extract_city_state_country_from_address(addr):
 
 def format_location_for_output(city, uf, country_code):
     """
-    Formata a string final a ser mostrada no frontend:
-    - Se uf presente e country_code presente: "Cidade — UF, CC"
-    - Se uf ausente e country_code presente: "Cidade — CC"
-    - Se nenhum: "Cidade"
+    Formata a string final:
+    - Se uf e country: "Cidade — UF, CC"
+    - Se apenas country: "Cidade — CC"
+    - Senão: "Cidade"
     """
     if country_code:
         if uf:
@@ -92,7 +86,7 @@ def autocomplete():
         return jsonify([])
 
     try:
-        cities = search_city(query)  # espera lista de resultados do Nominatim
+        cities = search_city(query)
         results = []
         seen = set()
 
@@ -102,10 +96,8 @@ def autocomplete():
             lon = c.get("lon", "")
 
             city, uf, country_code = extract_city_state_country_from_address(addr)
-
             name_display = format_location_for_output(city, uf, country_code)
 
-            # chave única para deduplicar: nome+uf+country+lat+lon (coordenadas evitam mesmona cidade em diferentes lugares)
             key = f"{city}|{uf}|{country_code}|{lat}|{lon}"
             if key in seen:
                 continue
@@ -119,7 +111,7 @@ def autocomplete():
             })
 
         return jsonify(results)
-    except Exception as e:
+    except Exception:
         return jsonify([]), 500
 
 
@@ -135,22 +127,16 @@ def weather():
 
     key = f"{lat},{lon}"
 
-    # cache simples
     cached = cache.get(key)
     if cached:
         return jsonify(cached)
 
     try:
-        w = get_weather(lat, lon)  # espera dict com keys: temperature, humidity, wind, description
+        w = get_weather(lat, lon)
     except Exception:
         return jsonify({"error": "Falha ao obter dados do clima"}), 500
 
-    # Tenta normalizar o nome exibido:
-    display_name = name
-    if not display_name:
-        # tenta pegar via reverse geocode? para simplicidade, apenas usa coordenadas como fallback
-        display_name = f"{lat},{lon}"
-
+    display_name = name if name and name.strip() else f"{lat},{lon}"
     result = {
         "city": display_name,
         "country": country or "",
@@ -204,7 +190,7 @@ def forecast():
         return jsonify({"error": "Erro inesperado"}), 500
 
 
-# Rotas de debug
+# Debug
 @app.route("/debug/queue")
 def ver_fila():
     return jsonify(fila.get_all())
