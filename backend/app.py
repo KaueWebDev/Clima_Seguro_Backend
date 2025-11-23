@@ -4,6 +4,7 @@ from utils.geocode import search_city
 from utils.weather import get_weather
 from utils.flags import get_flag_url
 from utils.structures import LinkedList, Queue, Stack, HashTable
+import requests
 
 app = Flask(__name__)
 CORS(app)
@@ -14,31 +15,24 @@ lista = LinkedList()
 cache = HashTable()
 
 
-def format_city_name(result):
-    """
-    Converte:
-    'Maceió, Região Geográfica..., Alagoas, Região Nordeste, Brasil'
-    para:
-    'Maceió - AL, BR'
-    """
-    addr = result.get("address", {})
+# --------------------------
+# Normalizar nomes (global)
+# --------------------------
+def normalize_name(full_name):
+    parts = full_name.split(",")
 
-    city = (
-        addr.get("city")
-        or addr.get("town")
-        or addr.get("village")
-        or addr.get("municipality")
-        or result.get("name", "").split(",")[0]
-    )
+    city = parts[0].strip()
 
-    state_code = addr.get("ISO3166-2-lvl4", "")
-    if state_code:
-        state_code = state_code.split("-")[-1]
+    state = "??"
+    country = "??"
 
-    country_code = addr.get("country_code", "").upper()
+    for p in parts:
+        if len(p.strip()) == 2 and p.strip().isalpha():
+            state = p.strip().upper()
+        if len(p.strip()) == 2 and p.strip().isalpha():
+            country = p.strip().upper()
 
-    final_name = f"{city} - {state_code}, {country_code}".strip()
-    return final_name
+    return city, state, country
 
 
 @app.route("/")
@@ -53,30 +47,26 @@ def autocomplete():
         return jsonify([])
 
     try:
-        results = []
-        seen = set()
-
         cities = search_city(query)
+        results = []
 
         for c in cities:
-            formatted = format_city_name(c)
+            name_raw = c.get("display_name", "Desconhecido")
 
-            if formatted in seen:
-                continue
-            seen.add(formatted)
-
-            addr = c.get("address", {})
+            city, state, country = normalize_name(name_raw)
 
             results.append({
-                "name": formatted,
+                "name": city,
+                "state": state,
+                "country": country,
                 "lat": c.get("lat", ""),
                 "lon": c.get("lon", ""),
-                "country_code": addr.get("country_code", "").upper()
+                "country_code": country
             })
+
         return jsonify(results)
 
-    except Exception as e:
-        print("Erro:", e)
+    except:
         return jsonify([]), 500
 
 
@@ -84,21 +74,20 @@ def autocomplete():
 def weather():
     lat = request.args.get("lat")
     lon = request.args.get("lon")
-    name = request.args.get("name", "Local Desconhecido")
+    name = request.args.get("name", "")
     country = request.args.get("country", "")
 
     if not lat or not lon:
         return jsonify({"error": "Coordenadas inválidas"}), 400
 
     key = f"{lat},{lon}"
-
     cached = cache.get(key)
     if cached:
         return jsonify(cached)
 
     try:
         w = get_weather(lat, lon)
-    except Exception:
+    except:
         return jsonify({"error": "Falha ao obter dados do clima"}), 500
 
     result = {
@@ -119,24 +108,42 @@ def weather():
     return jsonify(result)
 
 
-@app.route("/debug/queue")
-def ver_fila():
-    return jsonify(fila.get_all())
+# --------------------------
+# PREVISÃO OPEN-METEO
+# --------------------------
+@app.route("/api/forecast")
+def forecast():
+    lat = request.args.get("lat")
+    lon = request.args.get("lon")
 
+    if not lat or not lon:
+        return jsonify({"error": "Coordenadas inválidas"}), 400
 
-@app.route("/debug/stack")
-def ver_pilha():
-    return jsonify(pilha.get_all())
+    try:
+        url = (
+            "https://api.open-meteo.com/v1/forecast?"
+            f"latitude={lat}&longitude={lon}"
+            "&daily=temperature_2m_max,temperature_2m_min,weathercode"
+            "&timezone=auto"
+        )
 
+        r = requests.get(url)
+        data = r.json()
 
-@app.route("/debug/list")
-def ver_lista():
-    return jsonify(lista.to_list())
+        if "daily" not in data:
+            return jsonify({"error": "Falha ao obter previsão"}), 500
 
+        forecast = {
+            "time": data["daily"]["time"],
+            "tmax": data["daily"]["temperature_2m_max"],
+            "tmin": data["daily"]["temperature_2m_min"],
+            "wcode": data["daily"]["weathercode"]
+        }
 
-@app.route("/debug/cache")
-def ver_cache():
-    return jsonify(cache.data)
+        return jsonify(forecast)
+
+    except:
+        return jsonify({"error": "Erro inesperado"}), 500
 
 
 if __name__ == "__main__":
