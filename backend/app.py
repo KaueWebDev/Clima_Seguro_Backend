@@ -4,8 +4,6 @@ from utils.geocode import search_city
 from utils.weather import get_weather
 from utils.flags import get_flag_url
 from utils.structures import LinkedList, Queue, Stack, HashTable
-import requests
-import re
 
 app = Flask(__name__)
 CORS(app)
@@ -16,30 +14,31 @@ lista = LinkedList()
 cache = HashTable()
 
 
-def clean_location(display_name):
+def format_city_name(result):
     """
-    Limpa o display_name retornado pelo Nominatim
-    e devolve no formato: Cidade — UF, PAÍS
+    Converte:
+    'Maceió, Região Geográfica..., Alagoas, Região Nordeste, Brasil'
+    para:
+    'Maceió - AL, BR'
     """
+    addr = result.get("address", {})
 
-    parts = display_name.split(",")
-    parts = [p.strip() for p in parts]
+    city = (
+        addr.get("city")
+        or addr.get("town")
+        or addr.get("village")
+        or addr.get("municipality")
+        or result.get("name", "").split(",")[0]
+    )
 
-    city = parts[0] if len(parts) > 0 else "Desconhecido"
-    state = ""
-    country = ""
+    state_code = addr.get("ISO3166-2-lvl4", "")
+    if state_code:
+        state_code = state_code.split("-")[-1]
 
-    for p in parts:
-        if len(p) == 2 and p.isupper():
-            state = p
-        if len(p) == 2 and p.isalpha() and p.isupper():
-            country = p
+    country_code = addr.get("country_code", "").upper()
 
-    # fallback
-    if not country:
-        country = "??"
-
-    return f"{city} — {state if state else ''}{', ' if state else ''}{country}"
+    final_name = f"{city} - {state_code}, {country_code}".strip()
+    return final_name
 
 
 @app.route("/")
@@ -54,36 +53,30 @@ def autocomplete():
         return jsonify([])
 
     try:
+        results = []
+        seen = set()
+
         cities = search_city(query)
 
-        seen = set()
-        results = []
-
         for c in cities:
-            name_raw = c.get("display_name", "Desconhecido")
-            lat = c.get("lat", "")
-            lon = c.get("lon", "")
+            formatted = format_city_name(c)
+
+            if formatted in seen:
+                continue
+            seen.add(formatted)
+
             addr = c.get("address", {})
 
-            country_code = addr.get("country_code", "").upper()
-
-            clean = clean_location(name_raw)
-
-            key = f"{clean}-{lat}-{lon}"
-            if key in seen:
-                continue
-            seen.add(key)
-
             results.append({
-                "name": clean,
-                "lat": lat,
-                "lon": lon,
-                "country_code": country_code
+                "name": formatted,
+                "lat": c.get("lat", ""),
+                "lon": c.get("lon", ""),
+                "country_code": addr.get("country_code", "").upper()
             })
-
         return jsonify(results)
 
-    except Exception:
+    except Exception as e:
+        print("Erro:", e)
         return jsonify([]), 500
 
 
@@ -126,42 +119,6 @@ def weather():
     return jsonify(result)
 
 
-@app.route("/api/forecast")
-def forecast():
-    lat = request.args.get("lat")
-    lon = request.args.get("lon")
-
-    if not lat or not lon:
-        return jsonify({"error": "Coordenadas inválidas"}), 400
-
-    try:
-        url = (
-            "https://api.open-meteo.com/v1/forecast?"
-            f"latitude={lat}&longitude={lon}"
-            "&daily=temperature_2m_max,temperature_2m_min,weathercode"
-            "&timezone=auto"
-        )
-
-        r = requests.get(url)
-        data = r.json()
-
-        if "daily" not in data:
-            return jsonify({"error": "Falha ao obter previsão"}), 500
-
-        forecast = {
-            "time": data["daily"]["time"],
-            "tmax": data["daily"]["temperature_2m_max"],
-            "tmin": data["daily"]["temperature_2m_min"],
-            "wcode": data["daily"]["weathercode"],
-        }
-
-        return jsonify(forecast)
-
-    except Exception:
-        return jsonify({"error": "Erro inesperado"}), 500
-
-
-# Debug
 @app.route("/debug/queue")
 def ver_fila():
     return jsonify(fila.get_all())
