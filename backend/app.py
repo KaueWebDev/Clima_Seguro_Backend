@@ -1,159 +1,62 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
-from utils.geocode import search_city
-from utils.weather import get_weather
-from utils.flags import get_flag_url
 from utils.structures import LinkedList, Queue, Stack, HashTable
-import requests
+from utils.weather import get_weather
+from utils.geocode import search_city
+from utils.flags import get_flag_url
 
 app = Flask(__name__)
 CORS(app)
 
-# Estruturas
-fila = Queue()
-pilha = Stack()
-lista = LinkedList()
+# Estruturas de histórico
+queue_history = Queue()
+stack_history = Stack()
+list_history = LinkedList()
 cache = HashTable()
-
-# Mapeamento estado completo -> sigla (PT-BR)
-_STATES_PT_BR = {
-    "acre": "AC", "alagoas": "AL", "amapá": "AP", "amapa": "AP", "amazonas": "AM",
-    "bahia": "BA", "ceará": "CE", "ceara": "CE", "distrito federal": "DF",
-    "espírito santo": "ES", "espirito santo": "ES", "goiás": "GO", "goias": "GO",
-    "maranhão": "MA", "maranhao": "MA", "mato grosso": "MT", "mato grosso do sul": "MS",
-    "minas gerais": "MG", "pará": "PA", "para": "PA", "paraíba": "PB", "paraiba": "PB",
-    "paraná": "PR", "parana": "PR", "pernambuco": "PE", "piauí": "PI", "piaui": "PI",
-    "rio de janeiro": "RJ", "rio grande do norte": "RN", "rio grande do sul": "RS",
-    "rondônia": "RO", "rondonia": "RO", "roraima": "RR", "santa catarina": "SC",
-    "são paulo": "SP", "sao paulo": "SP", "sergipe": "SE", "tocantins": "TO"
-}
-
-
-def extract_city_state_country_from_address(addr):
-    """
-    Recebe o objeto 'address' do Nominatim e extrai city, uf, country_code.
-    Retorna (city, uf, country_code).
-    """
-    if not isinstance(addr, dict):
-        return ("Desconhecido", "", "")
-
-    city = (addr.get("city")
-            or addr.get("town")
-            or addr.get("village")
-            or addr.get("municipality")
-            or addr.get("county")
-            or addr.get("hamlet")
-            or addr.get("locality")
-            or "").strip()
-
-    state_full = (addr.get("state") or "").strip()
-    uf = ""
-    if state_full:
-        uf = _STATES_PT_BR.get(state_full.lower(), "")
-
-    country_code = (addr.get("country_code") or "").strip().upper()
-
-    return (city if city else "Desconhecido", uf, country_code)
-
-
-def format_location_for_output(city, uf, country_code):
-    """
-    Formata a string final:
-    - Se uf e country: "Cidade — UF, CC"
-    - Se apenas country: "Cidade — CC"
-    - Senão: "Cidade"
-    """
-    if country_code:
-        if uf:
-            return f"{city} — {uf}, {country_code}"
-        else:
-            return f"{city} — {country_code}"
-    else:
-        if uf:
-            return f"{city} — {uf}"
-        return city
-
-
-@app.route("/")
-def home():
-    return "API ON — Open-Meteo + Estruturas"
-
-
-@app.route("/api/autocomplete")
-def autocomplete():
-    query = request.args.get("q", "")
-    if len(query) < 2:
-        return jsonify([])
-
-    try:
-        cities = search_city(query)
-        results = []
-        seen = set()
-
-        for c in cities:
-            addr = c.get("address", {}) or {}
-            lat = c.get("lat", "")
-            lon = c.get("lon", "")
-
-            city, uf, country_code = extract_city_state_country_from_address(addr)
-            name_display = format_location_for_output(city, uf, country_code)
-
-            key = f"{city}|{uf}|{country_code}|{lat}|{lon}"
-            if key in seen:
-                continue
-            seen.add(key)
-
-            results.append({
-                "name": name_display,
-                "lat": lat,
-                "lon": lon,
-                "country_code": country_code
-            })
-
-        return jsonify(results)
-    except Exception:
-        return jsonify([]), 500
-
 
 @app.route("/api/weather")
 def weather():
     lat = request.args.get("lat")
     lon = request.args.get("lon")
-    name = request.args.get("name", "")
+    city = request.args.get("city", "Desconhecido")
+    state = request.args.get("state", "")
     country = request.args.get("country", "")
 
     if not lat or not lon:
         return jsonify({"error": "Coordenadas inválidas"}), 400
 
+    # Cache key
     key = f"{lat},{lon}"
-
     cached = cache.get(key)
     if cached:
         return jsonify(cached)
 
+    # Busca clima real
     try:
         w = get_weather(lat, lon)
     except Exception:
         return jsonify({"error": "Falha ao obter dados do clima"}), 500
 
-    display_name = name if name and name.strip() else f"{lat},{lon}"
     result = {
-        "city": display_name,
-        "country": country or "",
-        "flag": get_flag_url(country) if country else "",
-        "temp": w.get("temperature"),
-        "humidity": w.get("humidity"),
-        "wind": w.get("wind"),
-        "description": w.get("description")
+        "city": city,
+        "state": state,
+        "country": country,
+        "flag": get_flag_url(country),
+        "temp": w["temperature"],
+        "humidity": w["humidity"],
+        "wind": w["wind"],
+        "description": w["description"]
     }
 
+    # Atualiza histórico
+    history_entry = f"{city}, {state}, {country}"
+    queue_history.enqueue(history_entry)
+    stack_history.push(history_entry)
+    list_history.add(history_entry)
+
+    # Atualiza cache
     cache.set(key, result)
-    fila.enqueue(display_name)
-    pilha.push(display_name)
-    lista.add(result)
-
     return jsonify(result)
-
 
 @app.route("/api/forecast")
 def forecast():
@@ -164,65 +67,56 @@ def forecast():
         return jsonify({"error": "Coordenadas inválidas"}), 400
 
     try:
+        import requests
         url = (
-            "https://api.open-meteo.com/v1/forecast?"
-            f"latitude={lat}&longitude={lon}"
-            "&daily=temperature_2m_max,temperature_2m_min,weathercode"
-            "&timezone=auto"
+            f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}"
+            "&daily=temperature_2m_max,temperature_2m_min,weathercode&timezone=auto"
         )
-
-        r = requests.get(url, timeout=10)
-        r.raise_for_status()
+        r = requests.get(url)
         data = r.json()
-
-        if "daily" not in data:
-            return jsonify({"error": "Falha ao obter previsão"}), 500
-
         forecast = {
-            "time": data["daily"].get("time", []),
-            "tmax": data["daily"].get("temperature_2m_max", []),
-            "tmin": data["daily"].get("temperature_2m_min", []),
-            "wcode": data["daily"].get("weathercode", []),
+            "time": data["daily"]["time"],
+            "tmax": data["daily"]["temperature_2m_max"],
+            "tmin": data["daily"]["temperature_2m_min"],
+            "wcode": data["daily"]["weathercode"],
         }
-
         return jsonify(forecast)
     except Exception:
-        return jsonify({"error": "Erro inesperado"}), 500
+        return jsonify({"error": "Erro ao obter forecast"}), 500
 
+# Histórico
+@app.route("/history/queue")
+def get_queue():
+    return jsonify(queue_history.get_all())
 
-# Debug
-@app.route("/debug/queue")
-def ver_fila():
-    return jsonify(fila.get_all())
+@app.route("/history/stack")
+def get_stack():
+    return jsonify(stack_history.get_all())
 
+@app.route("/history/list")
+def get_list():
+    return jsonify(list_history.to_list())
 
-@app.route("/debug/stack")
-def ver_pilha():
-    return jsonify(pilha.get_all())
+@app.route("/api/autocomplete")
+def autocomplete():
+    query = request.args.get("q", "")
+    if len(query) < 2:
+        return jsonify([])
 
-
-@app.route("/debug/list")
-def ver_lista():
-    return jsonify(lista.to_list())
-
-
-@app.route("/debug/cache")
-def ver_cache():
-    return jsonify(cache.data)
-
+    try:
+        cities = search_city(query)
+        results = []
+        for c in cities[:2]:  # só 2 resultados
+            addr = c.get("address", {})
+            results.append({
+                "name": c.get("display_name", "Desconhecido"),
+                "lat": c.get("lat", ""),
+                "lon": c.get("lon", ""),
+                "country_code": addr.get("country_code", "").upper()
+            })
+        return jsonify(results)
+    except Exception:
+        return jsonify([]), 500
 
 if __name__ == "__main__":
     app.run(debug=True)
-
-# Rotas para mostrar as estruturas no frontend
-@app.route("/api/debug/queue")
-def api_fila():
-    return jsonify(fila.get_all())  # mostra a Queue
-
-@app.route("/api/debug/stack")
-def api_pilha():
-    return jsonify(pilha.get_all())  # mostra a Stack
-
-@app.route("/api/debug/list")
-def api_lista():
-    return jsonify(lista.to_list())   # mostra a LinkedList
