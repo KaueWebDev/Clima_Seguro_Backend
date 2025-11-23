@@ -213,3 +213,16 @@ def ver_cache():
 
 if __name__ == "__main__":
     app.run(debug=True)
+
+# Rotas para mostrar as estruturas no frontend
+@app.route("/api/debug/queue")
+def api_fila():
+    return jsonify(fila.get_all())  # mostra a Queue
+
+@app.route("/api/debug/stack")
+def api_pilha():
+    return jsonify(pilha.get_all())  # mostra a Stack
+
+@app.route("/api/debug/list")
+def api_lista():
+    return jsonify(lista.to_list())   # mostra a LinkedList
