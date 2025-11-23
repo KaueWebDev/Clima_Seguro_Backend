@@ -1,45 +1,115 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
-from utils.structures import LinkedList, Queue, Stack, HashTable
-from utils.weather import get_weather
 from utils.geocode import search_city
+from utils.weather import get_weather
 from utils.flags import get_flag_url
+from utils.structures import LinkedList, Queue, Stack, HashTable
+import requests
+import re
 
 app = Flask(__name__)
 CORS(app)
 
-# Estruturas de histórico
-queue_history = Queue()
-stack_history = Stack()
-list_history = LinkedList()
+fila = Queue()
+pilha = Stack()
+lista = LinkedList()
 cache = HashTable()
+
+
+def clean_location(display_name):
+    """
+    Limpa o display_name retornado pelo Nominatim
+    e devolve no formato: Cidade — UF, PAÍS
+    """
+
+    parts = display_name.split(",")
+    parts = [p.strip() for p in parts]
+
+    city = parts[0] if len(parts) > 0 else "Desconhecido"
+    state = ""
+    country = ""
+
+    for p in parts:
+        if len(p) == 2 and p.isupper():
+            state = p
+        if len(p) == 2 and p.isalpha() and p.isupper():
+            country = p
+
+    # fallback
+    if not country:
+        country = "??"
+
+    return f"{city} — {state if state else ''}{', ' if state else ''}{country}"
+
+
+@app.route("/")
+def home():
+    return "API ON — Open-Meteo + Estruturas"
+
+
+@app.route("/api/autocomplete")
+def autocomplete():
+    query = request.args.get("q", "")
+    if len(query) < 2:
+        return jsonify([])
+
+    try:
+        cities = search_city(query)
+
+        seen = set()
+        results = []
+
+        for c in cities:
+            name_raw = c.get("display_name", "Desconhecido")
+            lat = c.get("lat", "")
+            lon = c.get("lon", "")
+            addr = c.get("address", {})
+
+            country_code = addr.get("country_code", "").upper()
+
+            clean = clean_location(name_raw)
+
+            key = f"{clean}-{lat}-{lon}"
+            if key in seen:
+                continue
+            seen.add(key)
+
+            results.append({
+                "name": clean,
+                "lat": lat,
+                "lon": lon,
+                "country_code": country_code
+            })
+
+        return jsonify(results)
+
+    except Exception:
+        return jsonify([]), 500
+
 
 @app.route("/api/weather")
 def weather():
     lat = request.args.get("lat")
     lon = request.args.get("lon")
-    city = request.args.get("city", "Desconhecido")
-    state = request.args.get("state", "")
+    name = request.args.get("name", "Local Desconhecido")
     country = request.args.get("country", "")
 
     if not lat or not lon:
         return jsonify({"error": "Coordenadas inválidas"}), 400
 
-    # Cache key
     key = f"{lat},{lon}"
+
     cached = cache.get(key)
     if cached:
         return jsonify(cached)
 
-    # Busca clima real
     try:
         w = get_weather(lat, lon)
     except Exception:
         return jsonify({"error": "Falha ao obter dados do clima"}), 500
 
     result = {
-        "city": city,
-        "state": state,
+        "city": name,
         "country": country,
         "flag": get_flag_url(country),
         "temp": w["temperature"],
@@ -48,15 +118,13 @@ def weather():
         "description": w["description"]
     }
 
-    # Atualiza histórico
-    history_entry = f"{city}, {state}, {country}"
-    queue_history.enqueue(history_entry)
-    stack_history.push(history_entry)
-    list_history.add(history_entry)
-
-    # Atualiza cache
     cache.set(key, result)
+    fila.enqueue(name)
+    pilha.push(name)
+    lista.add(result)
+
     return jsonify(result)
+
 
 @app.route("/api/forecast")
 def forecast():
@@ -67,56 +135,52 @@ def forecast():
         return jsonify({"error": "Coordenadas inválidas"}), 400
 
     try:
-        import requests
         url = (
-            f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}"
-            "&daily=temperature_2m_max,temperature_2m_min,weathercode&timezone=auto"
+            "https://api.open-meteo.com/v1/forecast?"
+            f"latitude={lat}&longitude={lon}"
+            "&daily=temperature_2m_max,temperature_2m_min,weathercode"
+            "&timezone=auto"
         )
+
         r = requests.get(url)
         data = r.json()
+
+        if "daily" not in data:
+            return jsonify({"error": "Falha ao obter previsão"}), 500
+
         forecast = {
             "time": data["daily"]["time"],
             "tmax": data["daily"]["temperature_2m_max"],
             "tmin": data["daily"]["temperature_2m_min"],
             "wcode": data["daily"]["weathercode"],
         }
+
         return jsonify(forecast)
+
     except Exception:
-        return jsonify({"error": "Erro ao obter forecast"}), 500
+        return jsonify({"error": "Erro inesperado"}), 500
 
-# Histórico
-@app.route("/history/queue")
-def get_queue():
-    return jsonify(queue_history.get_all())
 
-@app.route("/history/stack")
-def get_stack():
-    return jsonify(stack_history.get_all())
+# Debug
+@app.route("/debug/queue")
+def ver_fila():
+    return jsonify(fila.get_all())
 
-@app.route("/history/list")
-def get_list():
-    return jsonify(list_history.to_list())
 
-@app.route("/api/autocomplete")
-def autocomplete():
-    query = request.args.get("q", "")
-    if len(query) < 2:
-        return jsonify([])
+@app.route("/debug/stack")
+def ver_pilha():
+    return jsonify(pilha.get_all())
 
-    try:
-        cities = search_city(query)
-        results = []
-        for c in cities[:2]:  # só 2 resultados
-            addr = c.get("address", {})
-            results.append({
-                "name": c.get("display_name", "Desconhecido"),
-                "lat": c.get("lat", ""),
-                "lon": c.get("lon", ""),
-                "country_code": addr.get("country_code", "").upper()
-            })
-        return jsonify(results)
-    except Exception:
-        return jsonify([]), 500
+
+@app.route("/debug/list")
+def ver_lista():
+    return jsonify(lista.to_list())
+
+
+@app.route("/debug/cache")
+def ver_cache():
+    return jsonify(cache.data)
+
 
 if __name__ == "__main__":
     app.run(debug=True)
