@@ -1,4 +1,5 @@
-🌤️ Descrição do Projeto
+🌤️ Descrição do Projeto:
+
 O ClimaSeguro é uma plataforma web que permite ao usuário buscar cidades do mundo inteiro e visualizar:
 
 - Temperatura atual
@@ -18,6 +19,7 @@ Além disso, o sistema inclui:
 O projeto foi desenvolvido seguindo boas práticas de arquitetura, engloba front-end e back-end e cumpre requisitos de estruturas de dados e consumo de APIs.
 
 🚀 Como Instalar e Executar.
+
 🔧 Requisitos:
 
 - Python 3.10+
@@ -25,30 +27,42 @@ O projeto foi desenvolvido seguindo boas práticas de arquitetura, engloba front
 - Navegador moderno
 
 ▶️ 1. Rodando o Backend
+
 Clone o repositório
+
 git clone https://github.com/SEU-REPOSITORIO/clima-seguro.git
+
 cd clima-seguro/backend
 
 Crie um ambiente virtual:
+
 python -m venv venv
+
 source venv/bin/activate  # Linux/macOS
+
 venv\Scripts\activate      # Windows
 
 Instale as dependências:
+
 pip install -r requirements.txt
 
 Execute o servidor:
+
 python app.py
 
 O backend estará em:
+
 http://localhost:5000
 
 
 🌐 2. Rodando o Frontend.
+
 Basta abrir o arquivo:
+
 frontend/index.html
 
 Ou usar um servidor leve:
+
 npx http-server ./frontend
 
 
@@ -64,12 +78,19 @@ npx http-server ./frontend
 
 
 Para testar o backend manualmente:
+
 /api/autocomplete?q=rio
+
 /api/weather?lat=-22.9&lon=-43.2
+
 /api/forecast?lat=-22.9&lon=-43.2
+
 /debug/queue
+
 /debug/stack
+
 /debug/list
+
 /debug/cache
 
 
@@ -123,7 +144,9 @@ Estrutura de pastas organizada
 
 
 🔗 Links Importantes
+
 🌐 Site publicado:
+
 https://clima-seguro-frontend.onrender.com
 
 📘 Documentação API
