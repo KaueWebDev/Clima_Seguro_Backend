@@ -6,10 +6,11 @@ from utils.flags import get_flag_url
 from utils.structures import LinkedList, Queue, Stack, HashTable
 import requests
 
+# CONFIGURAÇÃO INICIAL DO FLASK + CORS
 app = Flask(__name__)
-CORS(app)
+CORS(app) # permite acesso externo ao backend
 
-# Estruturas
+# Estruturas de dados usadas
 fila = Queue()
 pilha = Stack()
 lista = LinkedList()
@@ -29,13 +30,8 @@ _STATES_PT_BR = {
     "são paulo": "SP", "sao paulo": "SP", "sergipe": "SE", "tocantins": "TO"
 }
 
-
+# Extrai cidade, UF e país do retorno do Nominatim
 def extract_city_state_country_from_address(addr):
-    """
-    Recebe o objeto 'address' do Nominatim (search_city) e tenta extrair
-    cidade, sigla do estado (UF) e country_code (BR, PT, US, etc).
-    Retorna (city, uf_or_empty, country_code_or_empty).
-    """
     if not isinstance(addr, dict):
         return ("Desconhecido", "", "")
 
@@ -61,14 +57,8 @@ def extract_city_state_country_from_address(addr):
 
     return (city if city else "Desconhecido", uf, country_code)
 
-
+# FORMATA O NOME PARA MOSTRAR NO FRONTEND
 def format_location_for_output(city, uf, country_code):
-    """
-    Formata a string final a ser mostrada no frontend:
-    - Se uf presente e country_code presente: "Cidade — UF, CC"
-    - Se uf ausente e country_code presente: "Cidade — CC"
-    - Se nenhum: "Cidade"
-    """
     if country_code:
         if uf:
             return f"{city} — {uf}, {country_code}"
@@ -79,12 +69,12 @@ def format_location_for_output(city, uf, country_code):
             return f"{city} — {uf}"
         return city
 
-
+# Página raiz
 @app.route("/")
 def home():
     return "API ON — Open-Meteo + Estruturas"
 
-
+# ROTA DO AUTOCOMPLETE (buscar cidade)
 @app.route("/api/autocomplete")
 def autocomplete():
     query = request.args.get("q", "")
@@ -105,7 +95,7 @@ def autocomplete():
 
             name_display = format_location_for_output(city, uf, country_code)
 
-            # chave única para deduplicar: nome+uf+country+lat+lon (coordenadas evitam mesmona cidade em diferentes lugares)
+            # chave para evitar duplicados
             key = f"{city}|{uf}|{country_code}|{lat}|{lon}"
             if key in seen:
                 continue
@@ -123,18 +113,17 @@ def autocomplete():
         # log opcional: print(e)
         return jsonify([]), 500
 
-
+# ROTA DE CLIMA ATUAL
 @app.route("/api/weather")
 def weather():
     lat = request.args.get("lat")
     lon = request.args.get("lon")
-    # name e country podem ser enviados pelo frontend, mas não são obrigatórios
     name = request.args.get("name", "")
     country = request.args.get("country", "")
 
     if not lat or not lon:
         return jsonify({"error": "Coordenadas inválidas"}), 400
-
+    # chave para cache
     key = f"{lat},{lon}"
 
     # cache simples
@@ -142,6 +131,7 @@ def weather():
     if cached:
         return jsonify(cached)
 
+    # Consulta clima
     try:
         w = get_weather(lat, lon)  # espera dict com keys: temperature, humidity, wind, description
     except Exception:
@@ -150,7 +140,7 @@ def weather():
     # Tenta normalizar o nome exibido:
     display_name = name
     if not display_name:
-        # tenta pegar via reverse geocode? para simplicidade, apenas usa coordenadas como fallback
+        # tenta pegar via reverse geocode para simplicidade, apenas usa coordenadas como fallback
         display_name = f"{lat},{lon}"
 
     result = {
@@ -163,6 +153,7 @@ def weather():
         "description": w.get("description")
     }
 
+    # Salva nos caches e estruturas
     cache.set(key, result)
     fila.enqueue(display_name)
     pilha.push(display_name)
@@ -170,7 +161,7 @@ def weather():
 
     return jsonify(result)
 
-
+# ROTA PARA PREVISÃO ESTENDIDA (5–7 dias)
 @app.route("/api/forecast")
 def forecast():
     lat = request.args.get("lat")
@@ -206,7 +197,7 @@ def forecast():
         return jsonify({"error": "Erro inesperado"}), 500
 
 
-# Rotas de debug (mantive)
+# ROTAS DE DEBUG — mostram estruturas de dados
 @app.route("/debug/queue")
 def ver_fila():
     return jsonify(fila.get_all())
@@ -226,6 +217,6 @@ def ver_lista():
 def ver_cache():
     return jsonify(cache.data)
 
-
+# INICIALIZAÇÃO DO SERVIDOR
 if __name__ == "__main__":
     app.run(debug=True)
