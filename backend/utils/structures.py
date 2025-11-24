@@ -1,27 +1,31 @@
-# Lista ligada
+# IMPLEMENTAÇÃO DE UMA LISTA LIGADA 
 class Node:
     def __init__(self, data):
         self.data = data
         self.next = None
 
+ 
 class LinkedList:
     def __init__(self):
-        self.head = None
-
+       self.head = None
+    
+    # Adiciona um novo elemento no início da lista
     def add(self, data):
         node = Node(data)
         node.next = self.head
         self.head = node
 
+    # Converte a lista ligada em uma lista Python normal
     def to_list(self):
         result = []
         current = self.head
+        # Percorre toda a estrutura enquanto houver nós
         while current:
             result.append(current.data)
             current = current.next
         return result
 
-# Fila
+# IMPLEMENTAÇÃO DE UMA FILA
 class Queue:
     def __init__(self):
         self.items = []
@@ -37,7 +41,7 @@ class Queue:
     def get_all(self):
         return self.items
 
-# Pilha
+# IMPLEMENTAÇÃO DE UMA PILHA
 class Stack:
     def __init__(self):
         self.items = []
@@ -53,7 +57,7 @@ class Stack:
     def get_all(self):
         return self.items
 
-# Tabela Hash simples
+# IMPLEMENTAÇÃO DE UMA TABELA HASH
 class HashTable:
     def __init__(self):
         self.data = {}
