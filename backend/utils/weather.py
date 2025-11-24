@@ -25,6 +25,7 @@ weather_map = {
     99: "Trovoada com granizo forte"
 }
 
+# Função que consulta dados de clima atual no Open-Meteo
 def get_weather(lat, lon):
     url = "https://api.open-meteo.com/v1/forecast"
     params = {
@@ -35,10 +36,11 @@ def get_weather(lat, lon):
         "timezone": "auto"
     }
 
+     # Envia a requisição HTTP usando GET
     res = requests.get(url, params=params)
-    data = res.json()
+    data = res.json()  # Converte JSON da resposta em dict Python
 
-    # Dados atuais
+    # Obtém dados do clima atual
     current = data.get("current_weather", {})
     if not current:
         return {
@@ -56,6 +58,7 @@ def get_weather(lat, lon):
     weather_code = current.get("weathercode", 0)
     description = weather_map.get(weather_code, "Condição atual")
 
+    # Retorna dados organizados para o frontend
     return {
         "temperature": current.get("temperature", 0),
         "humidity": humidity,
