@@ -150,11 +150,19 @@ Estrutura de pastas organizada
 https://clima-seguro-frontend.onrender.com
 
 📘 Documentação API
+
 A API possui endpoints:
+
 GET /api/autocomplete?q=
+
 GET /api/weather?lat=&lon=&name=&country=
+
 GET /api/forecast?lat=&lon=
+
 GET /debug/queue
+
 GET /debug/stack
+
 GET /debug/list
+
 GET /debug/cache
